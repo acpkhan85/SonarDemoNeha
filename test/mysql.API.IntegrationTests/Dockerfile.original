@@ -1,0 +1,32 @@
+#See https://aka.ms/containerfastmode to understand how Visual Studio uses this Dockerfile to build your images for faster debugging.
+
+FROM mcr.microsoft.com/dotnet/runtime:3.1 AS base
+WORKDIR /app
+
+FROM mcr.microsoft.com/dotnet/sdk:3.1 AS build
+WORKDIR /src
+COPY ["test/mysql.API.IntegrationTests/mysql.API.IntegrationTests.csproj", "test/mysql.API.IntegrationTests/"]
+COPY ["src/Infrastructure/mysql.Persistence/mysql.Persistence.csproj", "src/Infrastructure/mysql.Persistence/"]
+COPY ["src/Core/mysql.Application/mysql.Application.csproj", "src/Core/mysql.Application/"]
+COPY ["src/Core/mysql.Domain/mysql.Domain.csproj", "src/Core/mysql.Domain/"]
+COPY ["src/API/mysql.Api/mysql.Api.csproj", "src/API/mysql.Api/"]
+COPY ["src/Infrastructure/mysql.Infrastructure/mysql.Infrastructure.csproj", "src/Infrastructure/mysql.Infrastructure/"]
+COPY ["src/Infrastructure/mysql.Identity/mysql.Identity.csproj", "src/Infrastructure/mysql.Identity/"]
+RUN dotnet restore "test/mysql.API.IntegrationTests/mysql.API.IntegrationTests.csproj"
+COPY . .
+WORKDIR "/src/test/mysql.API.IntegrationTests"
+RUN dotnet build "mysql.API.IntegrationTests.csproj" -c Release -o /app/build
+
+ADD https://github.com/ufoscout/docker-compose-wait/releases/download/2.5.0/wait /wait
+RUN chmod +x /wait
+
+# Wait for sql server and then migrate the db and run tests
+CMD /wait && dotnet ef database update --context MyDbContext && dotnet test --no-build
+
+FROM build AS publish
+RUN dotnet publish "mysql.API.IntegrationTests.csproj" -c Release -o /app/publish
+
+FROM base AS final
+WORKDIR /app
+COPY --from=publish /app/publish .
+ENTRYPOINT ["dotnet", "mysql.API.IntegrationTests.dll"]

@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "mysql.API.IntegrationTests": {
+      "commandName": "Project"
+    },
+    "Docker": {
+      "commandName": "Docker"
+    }
+  }
+}
